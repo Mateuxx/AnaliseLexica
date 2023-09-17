@@ -87,7 +87,7 @@ int eh_palavra_reservada(char *palavra) {
     return 0; // Não é uma palavra reservada
 }
 
-int obter_token_operador(char operador) {
+char obter_token_operador(char operador) {
     char operadores[] = {',', ';', '(', ')', '[', ']', '{', '}', '+', '-', '*', '/', '%', '&', '|', '~', '=', '<', '>', ':'};
     int tokens[] = {OPERADOR_VIRGULA, OPERADOR_PONTOVIRGULA, OPERADOR_LPAREN, OPERADOR_RPAREN, OPERADOR_COLCHETE_ESQ, OPERADOR_COLCHETE_DIR, OPERADOR_CHAVE_ESQ, OPERADOR_CHAVE_DIR, OPERADOR_SOMA, OPERADOR_SUBTRACAO, OPERADOR_MULTIPLICACAO, OPERADOR_DIVISAO, OPERADOR_MODULO, OPERADOR_E, OPERADOR_OU, OPERADOR_NAO, OPERADOR_ATRIBUICAO, OPERADOR_MENOR, OPERADOR_MAIOR, OPERADOR_DOISPONTOS};
     
@@ -98,9 +98,65 @@ int obter_token_operador(char operador) {
             return tokens[i];
         }
     }
-    
+
     return -1; // Operador desconhecido
 }
+
+char *getOperatorTokenName(int num) {
+    switch (num) {
+        case OPERADOR_VIRGULA:
+            return "OPERADOR_VIRGULA";
+        case OPERADOR_PONTOVIRGULA:
+            return "OPERADOR_PONTOVIRGULA";
+        case OPERADOR_LPAREN:
+            return "OPERADOR_LPAREN";
+        case OPERADOR_RPAREN:
+            return "OPERADOR_RPAREN";
+        case OPERADOR_COLCHETE_ESQ:
+            return "OPERADOR_COLCHETE_ESQ";
+        case OPERADOR_COLCHETE_DIR:
+            return "OPERADOR_COLCHETE_DIR";
+        case OPERADOR_CHAVE_ESQ:
+            return "OPERADOR_CHAVE_ESQ";
+        case OPERADOR_CHAVE_DIR:
+            return "OPERADOR_CHAVE_DIR";
+        case OPERADOR_ATRIBUICAO:
+            return "OPERADOR_ATRIBUICAO";
+        case OPERADOR_SOMA:
+            return "OPERADOR_SOMA";
+        case OPERADOR_SUBTRACAO:
+            return "OPERADOR_SUBTRACAO";
+        case OPERADOR_MULTIPLICACAO:
+            return "OPERADOR_MULTIPLICACAO";
+        case OPERADOR_DIVISAO:
+            return "OPERADOR_DIVISAO";
+        case OPERADOR_MODULO:
+            return "OPERADOR_MODULO";
+        case OPERADOR_MENOR:
+            return "OPERADOR_MENOR";
+        case OPERADOR_MAIOR:
+            return "OPERADOR_MAIOR";
+        case OPERADOR_E:
+            return "OPERADOR_E";
+        case OPERADOR_OU:
+            return "OPERADOR_OU";
+        case OPERADOR_NAO:
+            return "OPERADOR_NAO";
+        case OPERADOR_LE:
+            return "OPERADOR_LE";
+        case OPERADOR_GE:
+            return "OPERADOR_GE";
+        case OPERADOR_EQ:
+            return "OPERADOR_EQ";
+        case OPERADOR_PONTO:
+            return "OPERADOR_PONTO";
+        case OPERADOR_DOISPONTOS:
+            return "OPERADOR_DOISPONTOS";
+        default:
+            return NULL; // Retorne NULL para valores desconhecidos
+    }
+}
+
 
 int verificar_operador_composto(FILE *arquivo, char *token) {
     int c = fgetc(arquivo);
@@ -113,7 +169,6 @@ int verificar_operador_composto(FILE *arquivo, char *token) {
     switch (token[0]) {
         case '<':
         case '>':
-        case '=':
         case '!':
         case '+':
         case '-':
@@ -125,11 +180,21 @@ int verificar_operador_composto(FILE *arquivo, char *token) {
                 ungetc(c, arquivo); // Coloca o caractere de volta no arquivo
                 return obter_token_operador(token[0]); // Retorna o operador simples
             }
+        case '=':
+            if (c == '=') {
+                token[1] = c;
+                token[2] = '\0';
+                return obter_token_operador(token[0]);
+            } else {
+                ungetc(c, arquivo); // Coloca o caractere de volta no arquivo
+                return -1; // Operador desconhecido
+            }
         default:
             ungetc(c, arquivo); // Coloca o caractere de volta no arquivo
             return -1; // Não é um operador composto
     }
 }
+
 
 
 
@@ -268,29 +333,35 @@ void analise_lexica(FILE *arquivo, FILE *saida) {
                 fprintf(saida, "Token: DESCONHECIDO\t\tLexema: %s\n", token);
                 if (!confere_simbolo(token)) { insertSymbol(token, TOKEN_ERROR);}
             }
-        } else if (strchr(".,;()[]{}+-*%/&|~:=", c) != NULL) {
             // Operadores e caracteres especiais
+        } else if (c == '.' || c == ',' || c == ';' || 
+                    c == '(' || c == ')' || c == '[' || c == ']' || c == '{' || c == '}' || 
+                    c == '+' || c == '-' || c == '*' || c == '/' || c == '%' || c == '&' || c == '|' ||
+                     c == '~' || c == ':' || c == '<' || c == '>') {
             token[0] = c;
             token[1] = '\0';
             int token_operador = obter_token_operador(token[0]);
+            printf("%d",token_operador);
+            char * tokenName = getOperatorTokenName(token_operador);
+            printf("A string retornada é: %s\n",tokenName);
             if (token_operador != -1) {
-                fprintf(saida, "Token: OPERADOR_%s\t\tLexema: %s\n", token, token);
+                fprintf(saida, "Token:  %s\t\tLexema: %s\n", tokenName, token);
             } else {
                 fprintf(saida, "Token: DESCONHECIDO\t\tLexema: %s\n", token);
                 if (!confere_simbolo(token)) { insertSymbol(token, TOKEN_ERROR);}
             }
         }
-         else {
-            // Operadores compostos
-            token[0] = c;
-            int token_operador = verificar_operador_composto(arquivo, token);
-            if (token_operador != -1) {
-                fprintf(saida, "Token: OPERADOR_%s\t\tLexema: %s\n", token, token);
-            } else {
-                fprintf(saida, "Token: DESCONHECIDO\t\tLexema: %s\n", token);
-                if (!confere_simbolo(token)) { insertSymbol(token, TOKEN_ERROR);}
-            }
-        }
+          else {
+             // Operadores compostos
+             token[0] = c;
+             int token_operador = verificar_operador_composto(arquivo, token);
+             if (token_operador != -1) {
+                 fprintf(saida, "Token: OPERADOR_%s\t\tLexema: %s\n", token, token);
+             } else {
+                 fprintf(saida, "Token: DESCONHECIDO\t\tLexema: %s\n", token);
+                 if (!confere_simbolo(token)) { insertSymbol(token, TOKEN_ERROR);}
+             }
+         }
     }
 
     // Verificar se o código terminou com um comentário de bloco aberto

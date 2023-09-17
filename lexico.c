@@ -38,14 +38,14 @@ int lookup_symbol(char* name) {
     return ID;
 }
 
-int verificaToken(Token token){
-    if(token.type == 0){
-        return 1;
-    }
-    else{
-        return 0;
-    }
-} 
+// int verificaToken(Token token){
+//     if(token.type == 0){
+//         return 1;
+//     }
+//     else{
+//         return 0;
+//     }
+// } 
 
 void grava_token(FILE *file, Token token){
     fprintf(file, "<%s, %s>\n", token.name, token.value);

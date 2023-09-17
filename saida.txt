@@ -1,3 +1,6 @@
+Token: KW_while		Lexema: while
+Token:  OPERADOR_LPAREN		Lexema: (
 Token: TK_IDENTIFIER	Lexema: a
-Token: OPERADOR_%		Lexema: %
+Token:  OPERADOR_MAIOR		Lexema: >
 Token: TK_IDENTIFIER	Lexema: b
+Token:  OPERADOR_RPAREN		Lexema: )
