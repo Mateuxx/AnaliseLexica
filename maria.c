@@ -3,12 +3,29 @@
 #include <string.h>
 #include <ctype.h>
 #include "tokens.h"
+#include <stdbool.h> 
+
 
 struct SymbolEntry {
     char name[50]; // -> Nome do token
     int type;      // -> Símbolo
     struct SymbolEntry* next; // Para tratamento de colisões
 };
+
+// Variável global para controlar o número de linha
+int linha_atual = 1;
+
+int getLineNumber(void) {
+    return linha_atual;
+}
+
+// Variável global
+bool e = true;
+
+// Função para verificar se a análise ainda está em execução
+int isRunning(void) {
+    return e ? 1 : 0;
+}
 
 // Tamanho da tabela de símbolos (um número primo)
 #define TABLE_SIZE 101
@@ -253,6 +270,9 @@ char prox_char(FILE* file){
     do {
         ch = fgetc(file);
     } while(ch == ' ' || ch == '\t' || ch == '\n');
+        if(ch=='\n') {
+            linha_atual++;
+        }
     return ch;
 }
 
@@ -260,8 +280,6 @@ void grava_token(FILE *saida, char *token, char *lexema) {
     fprintf(saida, "Token:%-20s\tLexema: %s\n", token, lexema);
 }
 
-
-// Função principal para análise léxica
 void analise_lexica(FILE *arquivo, FILE *saida) {
     char token[100];
     int c;
@@ -269,23 +287,29 @@ void analise_lexica(FILE *arquivo, FILE *saida) {
     int comentario = 0; // Variável para controlar se estamos dentro de um comentário de bloco
     int cont = 0; //contador
 
-    while ((c = fgetc(arquivo)) != EOF) {
+    while ((c = prox_char(arquivo)) != EOF) {
+          
+        if (c == '\n') {
+            // Atualize o número da linha quando encontrar uma nova linha
+            linha_atual++;
+        }
         if (c == '/') {
-            int c2 = fgetc(arquivo);
+            int c2 = prox_char(arquivo);
             if (c2 == '/') {
                 // É um comentário de linha, ignorar até a quebra de linha
-                while ((c = fgetc(arquivo)) != EOF && c != '\n');
+                while ((c = prox_char(arquivo)) != EOF && c != '\n');
             } else if (c2 == '*') {
                 // É o início de um comentário de bloco, marcar como tal
                 comentario = 1;
                 while (1) {
-                    c = fgetc(arquivo);
+                    c = prox_char(arquivo);
                     if (c == EOF) {
+                        e = false;
                         //fprintf(saida, "Erro: Comentário de bloco não fechado.\n");
                         break;
                     }
                     if (c == '*') {
-                        int c3 = fgetc(arquivo);
+                        int c3 = prox_char(arquivo);
                         if (c3 == '/') {
                             comentario = 0; // Fim do comentário de bloco
                             break;
@@ -310,7 +334,7 @@ void analise_lexica(FILE *arquivo, FILE *saida) {
         } else if (comentario) {
             // Estamos dentro de um comentário de bloco, ignorar até encontrar o fim
             if (c == '*') {
-                int c2 = fgetc(arquivo);
+                int c2 = prox_char(arquivo);
                 if (c2 == '/') {
                     comentario = 0; // Fim do comentário de bloco
                 } else {
@@ -325,14 +349,14 @@ void analise_lexica(FILE *arquivo, FILE *saida) {
             int i = 0;
             while (isalnum(c) || c == '_') {
                 token[i++] = c;
-                c = fgetc(arquivo);
+                c = prox_char(arquivo);
             }
             token[i] = '\0';
             if (eh_palavra_reservada(token)) {
                 to_upper(token);
                 fprintf(saida, "Token: KW_%-20s\t\tLexema: %s\n", token, token);
             } else {
-                grava_token(saida, "",token);
+                grava_token(saida, "TW_IDENTIFIER",token);
                 // Adicione o identificador à tabela de símbolos
                 if (!confere_simbolo(token)) { insertSymbol(token, TOKEN_ERROR);}
             }
@@ -342,7 +366,7 @@ void analise_lexica(FILE *arquivo, FILE *saida) {
             int i = 0;
             while (isdigit(c) || c == '.') {
                 token[i++] = c;
-                c = fgetc(arquivo);
+                c = prox_char(arquivo);
             }
             token[i] = '\0';
             if (strchr(token, '.') != NULL) {
@@ -370,32 +394,28 @@ void analise_lexica(FILE *arquivo, FILE *saida) {
                 token[cont+1] ='\0';// Adicione o apóstrofo simples de fechamento ao token
                 grava_token(saida, "LIT_CHAR", token);
             } else {
-                grava_token(saida, "DESCONHECIDO", token);
-                break;
+                // Tratamento de erro: caractere literal não foi fechado
+                // Você pode lançar um erro ou tomar alguma outra ação apropriada aqui.
             }
         }
          else if (c == '"') {
             int i = 0;
             token[i++] = '"';
-            c = fgetc(arquivo);
+            c = prox_char(arquivo);
             while (c != EOF && c != '"') {
                 token[i++] = c;
-                c = fgetc(arquivo);
+                c = prox_char(arquivo);
             }
             if (c == '"') {
                 token[i++] = '"';
                 token[i] = '\0';
-
-                char lexema[1024];
-                sprintf(lexema, "'%s'", token);
-
-                fprintf(saida, "Token: LIT_STRING\tLexema: %s\n", lexema);
+                grava_token(saida, "LIT_STRING",token);
                 if (!confere_simbolo(token)) {
                     insertSymbol(token, LIT_STRING);
                 }
             } else {
                 token[i++] = '\0';
-                fprintf(saida, "Token: DESCONHECIDO\tLexema: %s\n", token);
+                grava_token(saida, "DESCONHECIDO",token);
             }
         } 
 
@@ -492,14 +512,25 @@ void analise_lexica(FILE *arquivo, FILE *saida) {
                 } else{
                     grava_token(saida, "DESCONHECIDO", token);
                 }    
-            }             
+            }
+            if (c == EOF) {
+                e = false;
+            }            
     }
-            
+        
 
     // Verificar se o código terminou com um comentário de bloco aberto
     if (comentario) {
         fprintf(saida, "Erro: Comentário de bloco não fechado.\n");
     }
+
+    //função isRUnning
+    if (isRunning()) {
+        printf("A análise está em execução.\n");
+    } else {
+        printf("A análise foi concluída.\n");
+    }
+
 }
 
 int main() {
