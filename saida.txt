@@ -1,0 +1,3 @@
+Token: TK_IDENTIFIER	Lexema: a
+Token: OPERADOR_%		Lexema: %
+Token: TK_IDENTIFIER	Lexema: b
