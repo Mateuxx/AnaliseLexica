@@ -7,11 +7,10 @@
 
 
 struct SymbolEntry {
-    char name[50]; // -> Nome do token
-    int type;      // -> Símbolo
-    struct SymbolEntry* next; // Para tratamento de colisões
+    char name[100]; // Nome do símbolo (ajuste o tamanho conforme necessário)
+    char *type;     // Tipo do símbolo (agora um ponteiro para char)
+    struct SymbolEntry *next;
 };
-
 // Variável global para controlar o número de linha
 int linha_atual = 1;
 
@@ -43,13 +42,18 @@ int hash(char *name) {
 }
 
 // Função para inserir um símbolo na tabela de símbolos
-void insertSymbol(char *name, int type) {
+void insertSymbol(char *name, char *type) {
     int index = hash(name);
     
     // Criar uma nova entrada de símbolo
     struct SymbolEntry* newEntry = (struct SymbolEntry*) malloc(sizeof(struct SymbolEntry));
+    if (newEntry == NULL) {
+        fprintf(stderr, "Erro: Falha na alocação de memória para um novo símbolo.\n");
+        exit(1); // Você pode escolher como lidar com erros de alocação de memória
+    }
     strncpy(newEntry->name, name, sizeof(newEntry->name));
-    newEntry->type = type;
+    newEntry->name[sizeof(newEntry->name) - 1] = '\0'; // Certifique-se de que o nome está terminado
+    newEntry->type = strdup(type); // Copiar a string type
     newEntry->next = NULL;
     
     // Verificar se já existe uma lista para esse índice
@@ -83,7 +87,7 @@ void printSymbolTable() {
     for (int i = 0; i < TABLE_SIZE; i++) {
         struct SymbolEntry* entry = symbolTable[i];
         while (entry != NULL) {
-            printf("Nome: %-20s\tTipo: %d\n", entry->name, entry->type);
+            printf("Token: %-20s\tLexema: %s\n", entry->name, entry->type);
             entry = entry->next;
         }
     }
@@ -278,6 +282,8 @@ char prox_char(FILE* file){
 
 void grava_token(FILE *saida, char *token, char *lexema) {
     fprintf(saida, "Token:%-20s\tLexema: %s\n", token, lexema);
+    if (!confere_simbolo(token)) { insertSymbol(token, lexema);}
+
 }
 
 void analise_lexica(FILE *arquivo, FILE *saida) {
@@ -328,7 +334,7 @@ void analise_lexica(FILE *arquivo, FILE *saida) {
                     fprintf(saida, "Token: OPERADOR_%s\t\tLexema: %s\n",token, token);
                 } else {
                     fprintf(saida, "Token: DESCONHECIDO\t\tLexema: %s\n", token);
-                    if (!confere_simbolo(token)) { insertSymbol(token, TOKEN_ERROR);}
+                if (!confere_simbolo(token)) { insertSymbol(token, "TOKEN_ERROR");}
                 }
             }
         } else if (comentario) {
@@ -358,7 +364,7 @@ void analise_lexica(FILE *arquivo, FILE *saida) {
             } else {
                 grava_token(saida, "TW_IDENTIFIER",token);
                 // Adicione o identificador à tabela de símbolos
-                if (!confere_simbolo(token)) { insertSymbol(token, TOKEN_ERROR);}
+                // if (!confere_simbolo(token)) { insertSymbol(token, TOKEN_ERROR);}
             }
             ungetc(c, arquivo); // Coloca o caractere de volta no arquivo
         } else if (isdigit(c)) {
@@ -370,11 +376,12 @@ void analise_lexica(FILE *arquivo, FILE *saida) {
             }
             token[i] = '\0';
             if (strchr(token, '.') != NULL) {
-                fprintf(saida, "Token: LIT_REAL\tLexema: %s\n", token);
-                if (!confere_simbolo(token)) { insertSymbol(token, LIT_REAL);}
+                // fprintf(saida, "Token: LIT_REAL\tLexema: %s\n", token);
+                grava_token(saida, "LIT_REAL",token);
+                // if (!confere_simbolo(token)) { insertSymbol(token, "LIT_REAL");}
             } else {
                 grava_token(saida, "LIT_INT", token);
-                if (!confere_simbolo(token)) { insertSymbol(token, LIT_INT);}
+                if (!confere_simbolo(token)) { insertSymbol(token, "LIT_INT");}
             }
             ungetc(c, arquivo); // Coloca o caractere de volta no arquivo
         } 
@@ -410,9 +417,9 @@ void analise_lexica(FILE *arquivo, FILE *saida) {
                 token[i++] = '"';
                 token[i] = '\0';
                 grava_token(saida, "LIT_STRING",token);
-                if (!confere_simbolo(token)) {
-                    insertSymbol(token, LIT_STRING);
-                }
+                 if (!confere_simbolo(token)) {
+                     insertSymbol(token, "LIT_STRING");
+                 }
             } else {
                 token[i++] = '\0';
                 grava_token(saida, "DESCONHECIDO",token);
@@ -430,9 +437,11 @@ void analise_lexica(FILE *arquivo, FILE *saida) {
             char * tokenName = getOperatorTokenName(token_operador);
             if (token_operador != -1) {
                 grava_token(saida, tokenName, token);
+                if (!confere_simbolo(token)) { insertSymbol(token, tokenName);}
+
             } else {
                 grava_token(saida, "DESCONHECIDO", token);
-                if (!confere_simbolo(token)) { insertSymbol(token, TOKEN_ERROR);}
+                if (!confere_simbolo(token)) { insertSymbol(token, "TOKEN_ERROR");}
                 }
             }
             //operador Composto == 
@@ -442,6 +451,7 @@ void analise_lexica(FILE *arquivo, FILE *saida) {
                      token[0] = c;
                      token[1] = ch;
                      grava_token(saida, "OPERATOR_GE", token);
+                    // if (!confere_simbolo(token)) { insertSymbol(token, OPERATOR_GE);}
                 }else{
                 ungetc(ch, arquivo);
                 token[0] = c;
@@ -450,9 +460,11 @@ void analise_lexica(FILE *arquivo, FILE *saida) {
                 char * tokenName = getOperatorTokenName(token_operador);
                 if (token_operador != -1) {
                     grava_token(saida, tokenName, token);
+                    if (!confere_simbolo(token)) { insertSymbol(token, tokenName);}
+
                 } else {
                     grava_token(saida, "DESCONHECIDO", token);
-                    if (!confere_simbolo(token)) { insertSymbol(token, TOKEN_ERROR);}
+                    if (!confere_simbolo(token)) { insertSymbol(token, "TOKEN_ERROR");}
                     }
                     }
             }
@@ -475,7 +487,7 @@ void analise_lexica(FILE *arquivo, FILE *saida) {
                     grava_token(saida, "OPERADOR_MAIOR", token);
                 } else {
                     grava_token(saida, "DESCONHECIDO", token);
-                    if (!confere_simbolo(token)) { insertSymbol(token, TOKEN_ERROR);}
+                    // if (!confere_simbolo(token)) { insertSymbol(token, TOKEN_ERROR);}
                     }
                 }       
             }
@@ -497,7 +509,7 @@ void analise_lexica(FILE *arquivo, FILE *saida) {
                     grava_token(saida, "OPERATOR_MENOR", token);
                 } else {
                     grava_token(saida, "DESCONHECIDO", token);
-                    if (!confere_simbolo(token)) { insertSymbol(token, TOKEN_ERROR);}
+                    // if (!confere_simbolo(token)) { insertSymbol(token, TOKEN_ERROR);}
                     }
                 }       
             }

@@ -1,2 +1,1 @@
-Token:LIT_CHAR            	Lexema: 'a'
-Token:DESCONHECIDO        	Lexema: "palavra
+Token:LIT_REAL            	Lexema: 1.2
