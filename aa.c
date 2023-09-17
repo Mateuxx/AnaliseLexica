@@ -162,13 +162,9 @@ int verificar_pontuacao(FILE *arquivo, char *token) {
 
 // Função principal para análise léxica
 // Função principal para análise léxica
-// ...
-
-// Função principal para análise léxica
 void analise_lexica(FILE *arquivo) {
     char token[100];
     int c;
-    
     while ((c = fgetc(arquivo)) != EOF) {
         if (isspace(c)) {
             // Ignorar espaços em branco
@@ -186,24 +182,58 @@ void analise_lexica(FILE *arquivo) {
             } else {
                 printf("Token: TK_IDENTIFICADOR\tLexema: %s\n", token);
             }
-            ungetc(c, arquivo); // Coloca o caractere de volta no arquivo
         } else if (isdigit(c)) {
             // Literal inteiro ou real
-            // ...
+            int i = 0;
+            while (isdigit(c) || c == '.') {
+                token[i++] = c;
+                c = fgetc(arquivo);
+            }
+            token[i] = '\0';
+            if (strchr(token, '.') != NULL) {
+                printf("Token: REAL_LITERAL\tLexema: %s\n", token);
+            } else {
+                printf("Token: INT_LITERAL\tLexema: %s\n", token);
+            }
         } else if (c == '"') {
             // String literal
-            // ...
-        } else if (c == '.' || c == ';') {
-            // Ponto ou ponto e vírgula
+            int i = 0;
+            token[i++] = '"';
+            c = fgetc(arquivo);
+            while (c != EOF && c != '"') {
+                token[i++] = c;
+                c = fgetc(arquivo);
+            }
+            if (c == '"') {
+                token[i++] = '"';
+                token[i] = '\0';
+                printf("Token: STRING_LITERAL\tLexema: %s\n", token);
+            } else {
+                printf("Token: DESCONHECIDO\t\tLexema: %s\n", token);
+            }
+        } 
+        else if (c == '.') {
+            // Ponto
             token[0] = c;
             token[1] = '\0';
             int token_pontuacao = verificar_pontuacao(arquivo, token);
             if (token_pontuacao != -1) {
-                printf("Token: OPERADOR_%s\t\tLexema: %s\n", token, token);
+                printf("Token: OPERADOR_PONTO\t\tLexema: %s\n", token);
             } else {
                 printf("Token: DESCONHECIDO\t\tLexema: %s\n", token);
             }
-        } else {
+        }
+        else if (c == ';') {
+            // Ponto e vírgula
+            token[0] = c;
+            token[1] = '\0';
+            int token_pontuacao = verificar_pontuacao(arquivo, token);
+            if (token_pontuacao != -1) {
+                printf("Token: OPERADOR_PONTOVIRGULA\tLexema: %s\n", token);
+            } else {
+                printf("Token: DESCONHECIDO\t\tLexema: %s\n", token);
+            }
+        }else {
             // Operadores e caracteres especiais
             token[0] = c;
             token[1] = '\0';
@@ -221,7 +251,6 @@ void analise_lexica(FILE *arquivo) {
         }
     }
 }
-
 
 int main() {
     // Abra o arquivo para leitura

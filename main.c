@@ -61,48 +61,18 @@ int eh_palavra_reservada(char *palavra) {
 }
 
 int obter_token_operador(char operador) {
-    switch (operador) {
-        case ',':
-            return OPERADOR_VIRGULA;
-        case ';':
-            return OPERADOR_PONTOVIRGULA;
-        case '(':
-            return OPERADOR_LPAREN;
-        case ')':
-            return OPERADOR_RPAREN;
-        case '[':
-            return OPERADOR_COLCHETE_ESQ;
-        case ']':
-            return OPERADOR_COLCHETE_DIR;
-        case '{':
-            return OPERADOR_CHAVE_ESQ;
-        case '}':
-            return OPERADOR_CHAVE_DIR;
-        case '+':
-            return OPERADOR_SOMA;
-        case '-':
-            return OPERADOR_SUBTRACAO;
-        case '*':
-            return OPERADOR_MULTIPLICACAO;
-        case '/':
-            return OPERADOR_DIVISAO;
-        case '%':
-            return OPERADOR_MODULO;
-        case '&':
-            return OPERADOR_E;
-        case '|':
-            return OPERADOR_OU;
-        case '~':
-            return OPERADOR_NAO;
-        case '=':
-            return OPERADOR_ATRIBUICAO;
-        case '<':
-            return OPERADOR_MENOR;
-        case '>':
-            return OPERADOR_MAIOR;
-        default:
-            return -1; // Operador desconhecido
+    char operadores[] = {',', ';', '(', ')', '[', ']', '{', '}', '+', '-', '*', '/', '%', '&', '|', '~', '=', '<', '>'};
+    int tokens[] = {OPERADOR_VIRGULA, OPERADOR_PONTOVIRGULA, OPERADOR_LPAREN, OPERADOR_RPAREN, OPERADOR_COLCHETE_ESQ, OPERADOR_COLCHETE_DIR, OPERADOR_CHAVE_ESQ, OPERADOR_CHAVE_DIR, OPERADOR_SOMA, OPERADOR_SUBTRACAO, OPERADOR_MULTIPLICACAO, OPERADOR_DIVISAO, OPERADOR_MODULO, OPERADOR_E, OPERADOR_OU, OPERADOR_NAO, OPERADOR_ATRIBUICAO, OPERADOR_MENOR, OPERADOR_MAIOR};
+    
+    int num_operadores = sizeof(operadores) / sizeof(operadores[0]);
+    
+    for (int i = 0; i < num_operadores; i++) {
+        if (operador == operadores[i]) {
+            return tokens[i];
+        }
     }
+    
+    return -1; // Operador desconhecido
 }
 
 
@@ -160,10 +130,10 @@ int verificar_pontuacao(FILE *arquivo, char *token) {
     return -1; // Não é um ponto ou ponto e vírgula
 }
 
-// Função principal para análise léxica
-// Função principal para análise léxica
-// ...
+// Função para analisar caracteres literais
 
+
+// Função principal para análise léxica
 // Função principal para análise léxica
 void analise_lexica(FILE *arquivo) {
     char token[100];
@@ -189,38 +159,59 @@ void analise_lexica(FILE *arquivo) {
             ungetc(c, arquivo); // Coloca o caractere de volta no arquivo
         } else if (isdigit(c)) {
             // Literal inteiro ou real
-            // ...
+            int i = 0;
+            while (isdigit(c) || c == '.') {
+                token[i++] = c;
+                c = fgetc(arquivo);
+            }
+            token[i] = '\0';
+            if (strchr(token, '.') != NULL) {
+                printf("Token: REAL_LITERAL\tLexema: %s\n", token);
+            } else {
+                printf("Token: INT_LITERAL\tLexema: %s\n", token);
+            }
+            ungetc(c, arquivo); // Coloca o caractere de volta no arquivo
         } else if (c == '"') {
             // String literal
-            // ...
-        } else if (c == '.' || c == ';') {
-            // Ponto ou ponto e vírgula
+            int i = 0;
+            token[i++] = '"';
+            c = fgetc(arquivo);
+            while (c != EOF && c != '"') {
+                token[i++] = c;
+                c = fgetc(arquivo);
+            }
+            if (c == '"') {
+                token[i++] = '"';
+                token[i] = '\0';
+                printf("Token: STRING_LITERAL\tLexema: %s\n", token);
+            } else {
+                printf("Token: DESCONHECIDO\t\tLexema: %s\n", token);
+            }
+        } else if (strchr(".,;(){}", c) != NULL) {
+            // Operadores e caracteres especiais
             token[0] = c;
             token[1] = '\0';
-            int token_pontuacao = verificar_pontuacao(arquivo, token);
-            if (token_pontuacao != -1) {
+            int token_operador = obter_token_operador(token[0]);
+            if (token_operador != -1) {
                 printf("Token: OPERADOR_%s\t\tLexema: %s\n", token, token);
             } else {
                 printf("Token: DESCONHECIDO\t\tLexema: %s\n", token);
             }
-        } else {
-            // Operadores e caracteres especiais
+        }else {
+            // Operadores compostos
             token[0] = c;
             token[1] = '\0';
             int token_operador = verificar_operador_composto(arquivo, token);
             if (token_operador != -1) {
                 printf("Token: OPERADOR_%s\t\tLexema: %s\n", token, token);
             } else {
-                int token_operador_simples = obter_token_operador(token[0]);
-                if (token_operador_simples != -1) {
-                    printf("Token: OPERADOR_%s\t\tLexema: %s\n", token, token);
-                } else {
-                    printf("Token: DESCONHECIDO\t\tLexema: %s\n", token);
-                }
+                printf("Token: DESCONHECIDO\t\tLexema: %s\n", token);
             }
         }
     }
 }
+
+
 
 
 int main() {
