@@ -5,8 +5,8 @@
 #include "tokens.h"
 
 struct SymbolEntry {
-    char name[50]; // Nome do símbolo
-    int type;      // Tipo do símbolo
+    char name[50]; // -> Nome do token
+    int type;      // -> Símbolo
     struct SymbolEntry* next; // Para tratamento de colisões
 };
 
@@ -209,6 +209,16 @@ int verificar_operador_composto(FILE *arquivo, char *token) {
 }
 }
 
+void to_upper(char* string)
+{
+    const char OFFSET = 'a' - 'A';
+    while (*string)
+    {
+        *string = (*string >= 'a' && *string <= 'z') ? *string -= OFFSET : *string;
+        string++;
+    }
+}
+
 
 int verificar_string(FILE *arquivo, char *token) {
     int c = fgetc(arquivo);
@@ -245,6 +255,12 @@ char prox_char(FILE* file){
     } while(ch == ' ' || ch == '\t' || ch == '\n');
     return ch;
 }
+
+void grava_token(FILE *saida, char *token, char *lexema) {
+    fprintf(saida, "Token:%-20s\tLexema: %s\n", token, lexema);
+}
+
+
 // Função principal para análise léxica
 void analise_lexica(FILE *arquivo, FILE *saida) {
     char token[100];
@@ -284,7 +300,7 @@ void analise_lexica(FILE *arquivo, FILE *saida) {
                 token[1] = '\0';
                 int token_operador = obter_token_operador(token[0]);
                 if (token_operador != -1) {
-                    fprintf(saida, "Token: OPERADOR_%s\t\tLexema: %s\n", token, token);
+                    fprintf(saida, "Token: OPERADOR_%s\t\tLexema: %s\n",token, token);
                 } else {
                     fprintf(saida, "Token: DESCONHECIDO\t\tLexema: %s\n", token);
                     if (!confere_simbolo(token)) { insertSymbol(token, TOKEN_ERROR);}
@@ -312,9 +328,10 @@ void analise_lexica(FILE *arquivo, FILE *saida) {
             }
             token[i] = '\0';
             if (eh_palavra_reservada(token)) {
-                fprintf(saida, "Token: KW_%s\t\tLexema: %s\n", token, token);
+                to_upper(token);
+                fprintf(saida, "Token: KW_%-20s\t\tLexema: %s\n", token, token);
             } else {
-                fprintf(saida, "Token: TK_IDENTIFIER\tLexema: %s\n", token);
+                grava_token(saida, "TK_IDENTIFIER",token);
                 // Adicione o identificador à tabela de símbolos
                 if (!confere_simbolo(token)) { insertSymbol(token, TOKEN_ERROR);}
             }
@@ -331,7 +348,7 @@ void analise_lexica(FILE *arquivo, FILE *saida) {
                 fprintf(saida, "Token: LIT_REAL\tLexema: %s\n", token);
                 if (!confere_simbolo(token)) { insertSymbol(token, LIT_REAL);}
             } else {
-                fprintf(saida, "Token: LIT_INT\tLexema: %s\n", token);
+                grava_token(saida, "LIT_INT", token);
                 if (!confere_simbolo(token)) { insertSymbol(token, LIT_INT);}
             }
             ungetc(c, arquivo); // Coloca o caractere de volta no arquivo
@@ -347,10 +364,10 @@ void analise_lexica(FILE *arquivo, FILE *saida) {
             if (c == '"') {
                 token[i++] = '"';
                 token[i] = '\0';
-                fprintf(saida, "Token: LIT_STRING\tLexema: %s\n", token);
+                grava_token(saida, "LIT_STRING", token);
                 if (!confere_simbolo(token)) { insertSymbol(token, LIT_STRING);}
             } else {
-                fprintf(saida, "Token: DESCONHECIDO\t\tLexema: %s\n", token);
+                grava_token(saida, "DESCONHECIDDO", token);
                 if (!confere_simbolo(token)) { insertSymbol(token, TOKEN_ERROR);}
             }
             // Operadores e caracteres especiais
@@ -362,13 +379,11 @@ void analise_lexica(FILE *arquivo, FILE *saida) {
             token[0] = c;
             token[1] = '\0';
             int token_operador = obter_token_operador(token[0]);
-            printf("%d\n",token_operador);
             char * tokenName = getOperatorTokenName(token_operador);
-            printf("A string retornada é: %s\n",tokenName);
             if (token_operador != -1) {
-                fprintf(saida, "Token:  %s\t\tLexema: %s\n", tokenName, token);
+                grava_token(saida, tokenName, token);
             } else {
-                fprintf(saida, "Token: DESCONHECIDO\t\tLexema: %s\n", token);
+                grava_token(saida, "DESCONHECIDO", token);
                 if (!confere_simbolo(token)) { insertSymbol(token, TOKEN_ERROR);}
                 }
             }
@@ -376,25 +391,22 @@ void analise_lexica(FILE *arquivo, FILE *saida) {
             else if (c == '='){
                 ch = prox_char(arquivo);
                 if(ch == '=') {
-                    token[0] = c;
-                    token[1] = ch;
-                    token[2] = '\0';
-                    fprintf(saida, "Token:OPERATOR_EQ\t\tLexema: %s\n", token);
-                }else {
-                //operadores simples = 
+                     token[0] = c;
+                     token[1] = ch;
+                     grava_token(saida, "OPERATOR_GE", token);
+                }else{
+                ungetc(ch, arquivo);
                 token[0] = c;
                 token[1] = '\0';
                 int token_operador = obter_token_operador(token[0]);
-                printf("%d\n",token_operador);
                 char * tokenName = getOperatorTokenName(token_operador);
-                printf("A string retornada é: %s\n",tokenName);
                 if (token_operador != -1) {
-                    fprintf(saida, "Token:  %s\t\tLexema: %s\n", tokenName, token);
+                    grava_token(saida, tokenName, token);
                 } else {
-                    fprintf(saida, "Token: DESCONHECIDO\t\tLexema: %s\n", token);
+                    grava_token(saida, "DESCONHECIDO", token);
                     if (!confere_simbolo(token)) { insertSymbol(token, TOKEN_ERROR);}
                     }
-                }       
+                    }
             }
             //operador Composto >= 
             else if (c == '>'){
@@ -403,43 +415,18 @@ void analise_lexica(FILE *arquivo, FILE *saida) {
                     token[0] = c;
                     token[1] = ch;
                     token[2] = '\0';
-                    fprintf(saida, "Token:OPERATOR_GE\t\tLexema: %s\n", token);
+                    grava_token(saida, "OPERATOR_GE", token);
                 }else {
                 //operadore simples >
+                ungetc(ch, arquivo);
                 token[0] = c;
                 token[1] = '\0';
                 int token_operador = obter_token_operador(token[0]);
-                printf("%d\n",token_operador);
                 char * tokenName = getOperatorTokenName(token_operador);
-                printf("A string retornada é: %s\n",tokenName);
                 if (token_operador != -1) {
-                    fprintf(saida, "Token:  %s\t\tLexema: %s\n", tokenName, token);
+                    grava_token(saida, "OPERADOR_MAIOR", token);
                 } else {
-                    fprintf(saida, "Token: DESCONHECIDO\t\tLexema: %s\n", token);
-                    if (!confere_simbolo(token)) { insertSymbol(token, TOKEN_ERROR);}
-                    }
-                }       
-            }
-             //operador Composto >= 
-            else if (c == '>'){
-                ch = prox_char(arquivo);
-                if(ch == '=') {
-                    token[0] = c;
-                    token[1] = ch;
-                    token[2] = '\0';
-                    fprintf(saida, "Token:OPERATOR_GE\t\tLexema: %s\n", token);
-                }else {
-                //operadore simples >
-                token[0] = c;
-                token[1] = '\0';
-                int token_operador = obter_token_operador(token[0]);
-                printf("%d\n",token_operador);
-                char * tokenName = getOperatorTokenName(token_operador);
-                printf("A string retornada é: %s\n",tokenName);
-                if (token_operador != -1) {
-                    fprintf(saida, "Token:  %s\t\tLexema: %s\n", tokenName, token);
-                } else {
-                    fprintf(saida, "Token: DESCONHECIDO\t\tLexema: %s\n", token);
+                    grava_token(saida, "DESCONHECIDO", token);
                     if (!confere_simbolo(token)) { insertSymbol(token, TOKEN_ERROR);}
                     }
                 }       
@@ -451,19 +438,17 @@ void analise_lexica(FILE *arquivo, FILE *saida) {
                     token[0] = c;
                     token[1] = ch;
                     token[2] = '\0';
-                    fprintf(saida, "Token:OPERATOR_LE\t\tLexema: %s\n", token);
+                    grava_token(saida, "OPERATOR_LE", token);
                 }else {
-                //operador simples <
+                //operadore simples <
                 token[0] = c;
                 token[1] = '\0';
                 int token_operador = obter_token_operador(token[0]);
-                printf("%d\n",token_operador);
                 char * tokenName = getOperatorTokenName(token_operador);
-                printf("A string retornada é: %s\n",tokenName);
                 if (token_operador != -1) {
-                    fprintf(saida, "Token:  %s\t\tLexema: %s\n", tokenName, token);
+                    grava_token(saida, "OPERATOR_MENOR", token);
                 } else {
-                    fprintf(saida, "Token: DESCONHECIDO\t\tLexema: %s\n", token);
+                    grava_token(saida, "DESCONHECIDO", token);
                     if (!confere_simbolo(token)) { insertSymbol(token, TOKEN_ERROR);}
                     }
                 }       
@@ -475,9 +460,9 @@ void analise_lexica(FILE *arquivo, FILE *saida) {
                     token[0] = c;
                     token[1] = ch;
                     token[2] = '\0';
-                    fprintf(saida, "Token:OPERATOR_DIF\t\tLexema: %s\n", token);
+                    grava_token(saida, "OPERATOR_DIF", token);
                 } else{
-                    fprintf(saida, "Token: DESCONHECIDO\t\tLexema: %s\n", token);
+                    grava_token(saida, "DESCONHECIDO", token);
                 }    
             }             
     }
@@ -502,7 +487,7 @@ int main() {
     analise_lexica(arquivo, saida);
 
     // Imprima a tabela de símbolos
-    // printSymbolTable();
+    printSymbolTable();
 
     // Feche os arquivos
     fclose(arquivo);
