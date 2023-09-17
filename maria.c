@@ -267,6 +267,7 @@ void analise_lexica(FILE *arquivo, FILE *saida) {
     int c;
     char ch; //variavel para usar para pegar o proximoChar quando necessario
     int comentario = 0; // Variável para controlar se estamos dentro de um comentário de bloco
+    int cont = 0; //contador
 
     while ((c = fgetc(arquivo)) != EOF) {
         if (c == '/') {
@@ -331,7 +332,7 @@ void analise_lexica(FILE *arquivo, FILE *saida) {
                 to_upper(token);
                 fprintf(saida, "Token: KW_%-20s\t\tLexema: %s\n", token, token);
             } else {
-                grava_token(saida, "TK_IDENTIFIER",token);
+                grava_token(saida, "",token);
                 // Adicione o identificador à tabela de símbolos
                 if (!confere_simbolo(token)) { insertSymbol(token, TOKEN_ERROR);}
             }
@@ -352,8 +353,28 @@ void analise_lexica(FILE *arquivo, FILE *saida) {
                 if (!confere_simbolo(token)) { insertSymbol(token, LIT_INT);}
             }
             ungetc(c, arquivo); // Coloca o caractere de volta no arquivo
-        } else if (c == '"') {
-            // String literal
+        } 
+        //LITCHAR
+            else if (c == '\'') {
+            token[0] = c;
+            ch = prox_char(arquivo);
+            cont = 1; // Inicialize cont para 1
+            while (ch != '\'' && ch != '\n') { // Verifique se não é um apóstrofo simples ou uma nova linha
+                token[cont] = ch;
+                cont++;
+                ch = prox_char(arquivo);
+            }
+            if (ch == '\'') {
+                // Verificou-se que o caractere literal foi fechado corretamente
+                token[cont] = ch;
+                token[cont+1] ='\0';// Adicione o apóstrofo simples de fechamento ao token
+                grava_token(saida, "LIT_CHAR", token);
+            } else {
+                grava_token(saida, "DESCONHECIDO", token);
+                break;
+            }
+        }
+         else if (c == '"') {
             int i = 0;
             token[i++] = '"';
             c = fgetc(arquivo);
@@ -364,14 +385,21 @@ void analise_lexica(FILE *arquivo, FILE *saida) {
             if (c == '"') {
                 token[i++] = '"';
                 token[i] = '\0';
-                grava_token(saida, "LIT_STRING", token);
-                if (!confere_simbolo(token)) { insertSymbol(token, LIT_STRING);}
+
+                char lexema[1024];
+                sprintf(lexema, "'%s'", token);
+
+                fprintf(saida, "Token: LIT_STRING\tLexema: %s\n", lexema);
+                if (!confere_simbolo(token)) {
+                    insertSymbol(token, LIT_STRING);
+                }
             } else {
-                grava_token(saida, "DESCONHECIDDO", token);
-                if (!confere_simbolo(token)) { insertSymbol(token, TOKEN_ERROR);}
+                token[i++] = '\0';
+                fprintf(saida, "Token: DESCONHECIDO\tLexema: %s\n", token);
             }
-            // Operadores e caracteres especiais
-        } else if (c == '.' || c == ',' || c == ';' || 
+        } 
+
+        else if (c == '.' || c == ',' || c == ';' || 
                     c == '(' || c == ')' || c == '[' || c == ']' || c == '{' || c == '}' || 
                     c == '+' || c == '-' || c == '*' || c == '/' || c == '%' || c == '&' || c == '|' ||
                      c == '~' || c == ':' ) {
