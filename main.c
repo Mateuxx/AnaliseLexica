@@ -187,7 +187,7 @@ void analise_lexica(FILE *arquivo) {
             } else {
                 printf("Token: DESCONHECIDO\t\tLexema: %s\n", token);
             }
-        } else if (strchr(".,;(){}", c) != NULL) {
+        } else if (strchr(".,;(){}+- */& |~=< >", c) != NULL) {
             // Operadores e caracteres especiais
             token[0] = c;
             token[1] = '\0';
