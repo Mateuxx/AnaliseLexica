@@ -159,43 +159,55 @@ char *getOperatorTokenName(int num) {
 
 
 int verificar_operador_composto(FILE *arquivo, char *token) {
-    int c = fgetc(arquivo);
-    if (c == EOF) {
-        return -1; // Fim do arquivo
-    }
-
-    token[1] = '\0'; // Começamos com um caractere no token
+    char proximo_caractere = fgetc(arquivo);
+    int token_operador = -1;
 
     switch (token[0]) {
-        case '<':
-        case '>':
-        case '!':
-        case '+':
-        case '-':
-            if (c == '=') {
-                token[1] = c;
-                token[2] = '\0';
-                return obter_token_operador(token[0]);
-            } else {
-                ungetc(c, arquivo); // Coloca o caractere de volta no arquivo
-                return obter_token_operador(token[0]); // Retorna o operador simples
-            }
         case '=':
-            if (c == '=') {
-                token[1] = c;
-                token[2] = '\0';
-                return obter_token_operador(token[0]);
+            if (proximo_caractere == '=') {
+                strcat(token, "=");
+                token_operador = OPERADOR_EQ;
             } else {
-                ungetc(c, arquivo); // Coloca o caractere de volta no arquivo
-                return -1; // Operador desconhecido
+                // Não é um operador composto, volte um caractere para o arquivo
+                ungetc(proximo_caractere, arquivo);
             }
-        default:
-            ungetc(c, arquivo); // Coloca o caractere de volta no arquivo
-            return -1; // Não é um operador composto
-    }
+    //         break;
+    //     case '<':
+    //         if (proximo_caractere == '=') {
+    //             strcat(token, "=");
+    //             token_operador = OPERADOR_LE;
+    //         } else {
+    //             // Não é um operador composto, volte um caractere para o arquivo
+    //             ungetc(proximo_caractere, arquivo);
+    //         }
+    //         break;
+    //     case '>':
+    //         if (proximo_caractere == '=') {
+    //             strcat(token, "=");
+    //             token_operador = OPERADOR_GE;
+    //         } else {
+    //             // Não é um operador composto, volte um caractere para o arquivo
+    //             ungetc(proximo_caractere, arquivo);
+    //         }
+    //         break;
+    //     case '!':
+    //         if (proximo_caractere == '=') {
+    //             strcat(token, "=");
+    //             token_operador = OPERADOR_NE;
+    //         } else {
+    //             // Não é um operador composto, volte um caractere para o arquivo
+    //             ungetc(proximo_caractere, arquivo);
+    //         }
+    //         break;
+    //     // Adicione outros casos para operadores compostos aqui
+    //     default:
+    //         // Não é um operador composto, não faça nada
+    //         break;
+    // }
+
+    return token_operador;
 }
-
-
+}
 
 
 int verificar_string(FILE *arquivo, char *token) {
@@ -226,10 +238,18 @@ int verificar_pontuacao(FILE *arquivo, char *token) {
     return -1; // Não é um ponto ou ponto e vírgula
 }
 
+char prox_char(FILE* file){
+    char ch;
+    do {
+        ch = fgetc(file);
+    } while(ch == ' ' || ch == '\t' || ch == '\n');
+    return ch;
+}
 // Função principal para análise léxica
 void analise_lexica(FILE *arquivo, FILE *saida) {
     char token[100];
     int c;
+    char ch; //variavel para usar para pegar o proximoChar quando necessario
     int comentario = 0; // Variável para controlar se estamos dentro de um comentário de bloco
 
     while ((c = fgetc(arquivo)) != EOF) {
@@ -337,11 +357,12 @@ void analise_lexica(FILE *arquivo, FILE *saida) {
         } else if (c == '.' || c == ',' || c == ';' || 
                     c == '(' || c == ')' || c == '[' || c == ']' || c == '{' || c == '}' || 
                     c == '+' || c == '-' || c == '*' || c == '/' || c == '%' || c == '&' || c == '|' ||
-                     c == '~' || c == ':' || c == '<' || c == '>') {
+                     c == '~' || c == ':' ) {
+            //operadores simples
             token[0] = c;
             token[1] = '\0';
             int token_operador = obter_token_operador(token[0]);
-            printf("%d",token_operador);
+            printf("%d\n",token_operador);
             char * tokenName = getOperatorTokenName(token_operador);
             printf("A string retornada é: %s\n",tokenName);
             if (token_operador != -1) {
@@ -349,20 +370,118 @@ void analise_lexica(FILE *arquivo, FILE *saida) {
             } else {
                 fprintf(saida, "Token: DESCONHECIDO\t\tLexema: %s\n", token);
                 if (!confere_simbolo(token)) { insertSymbol(token, TOKEN_ERROR);}
+                }
             }
-        }
-          else {
-             // Operadores compostos
-             token[0] = c;
-             int token_operador = verificar_operador_composto(arquivo, token);
-             if (token_operador != -1) {
-                 fprintf(saida, "Token: OPERADOR_%s\t\tLexema: %s\n", token, token);
-             } else {
-                 fprintf(saida, "Token: DESCONHECIDO\t\tLexema: %s\n", token);
-                 if (!confere_simbolo(token)) { insertSymbol(token, TOKEN_ERROR);}
-             }
-         }
+            //operador Composto == 
+            else if (c == '='){
+                ch = prox_char(arquivo);
+                if(ch == '=') {
+                    token[0] = c;
+                    token[1] = ch;
+                    token[2] = '\0';
+                    fprintf(saida, "Token:OPERATOR_EQ\t\tLexema: %s\n", token);
+                }else {
+                //operadores simples = 
+                token[0] = c;
+                token[1] = '\0';
+                int token_operador = obter_token_operador(token[0]);
+                printf("%d\n",token_operador);
+                char * tokenName = getOperatorTokenName(token_operador);
+                printf("A string retornada é: %s\n",tokenName);
+                if (token_operador != -1) {
+                    fprintf(saida, "Token:  %s\t\tLexema: %s\n", tokenName, token);
+                } else {
+                    fprintf(saida, "Token: DESCONHECIDO\t\tLexema: %s\n", token);
+                    if (!confere_simbolo(token)) { insertSymbol(token, TOKEN_ERROR);}
+                    }
+                }       
+            }
+            //operador Composto >= 
+            else if (c == '>'){
+                ch = prox_char(arquivo);
+                if(ch == '=') {
+                    token[0] = c;
+                    token[1] = ch;
+                    token[2] = '\0';
+                    fprintf(saida, "Token:OPERATOR_GE\t\tLexema: %s\n", token);
+                }else {
+                //operadore simples >
+                token[0] = c;
+                token[1] = '\0';
+                int token_operador = obter_token_operador(token[0]);
+                printf("%d\n",token_operador);
+                char * tokenName = getOperatorTokenName(token_operador);
+                printf("A string retornada é: %s\n",tokenName);
+                if (token_operador != -1) {
+                    fprintf(saida, "Token:  %s\t\tLexema: %s\n", tokenName, token);
+                } else {
+                    fprintf(saida, "Token: DESCONHECIDO\t\tLexema: %s\n", token);
+                    if (!confere_simbolo(token)) { insertSymbol(token, TOKEN_ERROR);}
+                    }
+                }       
+            }
+             //operador Composto >= 
+            else if (c == '>'){
+                ch = prox_char(arquivo);
+                if(ch == '=') {
+                    token[0] = c;
+                    token[1] = ch;
+                    token[2] = '\0';
+                    fprintf(saida, "Token:OPERATOR_GE\t\tLexema: %s\n", token);
+                }else {
+                //operadore simples >
+                token[0] = c;
+                token[1] = '\0';
+                int token_operador = obter_token_operador(token[0]);
+                printf("%d\n",token_operador);
+                char * tokenName = getOperatorTokenName(token_operador);
+                printf("A string retornada é: %s\n",tokenName);
+                if (token_operador != -1) {
+                    fprintf(saida, "Token:  %s\t\tLexema: %s\n", tokenName, token);
+                } else {
+                    fprintf(saida, "Token: DESCONHECIDO\t\tLexema: %s\n", token);
+                    if (!confere_simbolo(token)) { insertSymbol(token, TOKEN_ERROR);}
+                    }
+                }       
+            }
+             //operador Composto <= 
+            else if (c == '<'){
+                ch = prox_char(arquivo);
+                if(ch == '=') {
+                    token[0] = c;
+                    token[1] = ch;
+                    token[2] = '\0';
+                    fprintf(saida, "Token:OPERATOR_LE\t\tLexema: %s\n", token);
+                }else {
+                //operador simples <
+                token[0] = c;
+                token[1] = '\0';
+                int token_operador = obter_token_operador(token[0]);
+                printf("%d\n",token_operador);
+                char * tokenName = getOperatorTokenName(token_operador);
+                printf("A string retornada é: %s\n",tokenName);
+                if (token_operador != -1) {
+                    fprintf(saida, "Token:  %s\t\tLexema: %s\n", tokenName, token);
+                } else {
+                    fprintf(saida, "Token: DESCONHECIDO\t\tLexema: %s\n", token);
+                    if (!confere_simbolo(token)) { insertSymbol(token, TOKEN_ERROR);}
+                    }
+                }       
+            }
+            //Operador composto !=
+               else if (c == '!'){
+                ch = prox_char(arquivo);
+                if(ch == '=') {
+                    token[0] = c;
+                    token[1] = ch;
+                    token[2] = '\0';
+                    fprintf(saida, "Token:OPERATOR_DIF\t\tLexema: %s\n", token);
+                } else{
+                    fprintf(saida, "Token: DESCONHECIDO\t\tLexema: %s\n", token);
+                }    
+            }             
     }
+            
 
     // Verificar se o código terminou com um comentário de bloco aberto
     if (comentario) {

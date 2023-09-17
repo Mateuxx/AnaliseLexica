@@ -1,6 +1,15 @@
-Token: KW_while		Lexema: while
+Token: KW_if		Lexema: if
 Token:  OPERADOR_LPAREN		Lexema: (
 Token: TK_IDENTIFIER	Lexema: a
-Token:  OPERADOR_MAIOR		Lexema: >
+Token:OPERATOR_EQ		Lexema: ==
 Token: TK_IDENTIFIER	Lexema: b
 Token:  OPERADOR_RPAREN		Lexema: )
+Token:  OPERADOR_CHAVE_ESQ		Lexema: {
+Token: TK_IDENTIFIER	Lexema: a
+Token:  OPERADOR_ATRIBUICAO		Lexema: =
+Token:  OPERADOR_PONTOVIRGULA		Lexema: ;
+Token: TK_IDENTIFIER	Lexema: a
+Token:  OPERADOR_SOMA		Lexema: +
+Token: TK_IDENTIFIER	Lexema: b
+Token:  OPERADOR_PONTOVIRGULA		Lexema: ;
+Token:  OPERADOR_CHAVE_DIR		Lexema: }
