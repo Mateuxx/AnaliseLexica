@@ -1,0 +1,57 @@
+    MANUAL DO USUÁRIO
+
+1)  Certifique-se de ter um arquivo de entrada chamado "teste.txt" na mesma pasta do programa. 
+    Este arquivo deve conter o código que deseja analisar.
+
+2)  Certifique-se de ter o arquivo de saída "saida.txt" na mesma pasta.
+    Este arquivo sirá armazenar os resultados da análise.
+
+3)  Compilação deverá ser feita da seguinte forma -> gcc main.c lexico.c -o lexico
+
+4)  Execução -> ./lexico
+
+5)  Formato de entrada:
+ex:     while (2) {
+	    print ("compilador");
+        }
+
+6)  Formato de saída:
+ex:     Token: KW_WHILE             Lexema: WHILE
+        Token:OPERADOR_LPAREN     	Lexema: (
+        Token:LIT_INT             	Lexema: 2
+        Token:OPERADOR_RPAREN     	Lexema: )
+        Token:OPERADOR_CHAVE_ESQ  	Lexema: {
+        Token:TW_IDENTIFIER       	Lexema: print
+        Token:OPERADOR_LPAREN     	Lexema: (
+        Token:LIT_STRING          	Lexema: "compilador"
+        Token:OPERADOR_RPAREN     	Lexema: )
+        Token:OPERADOR_PONTOVIRGULA	Lexema: ;
+        Token:OPERADOR_CHAVE_DIR  	Lexema: }
+
+7)  Os símbolos também serão armazenados em uma tabela de símbolos como a seguir:
+ex:         Tabela de Símbolos:
+            -------------------------------------------------
+            Token: OPERADOR_LPAREN          Lexema: (
+            Token: LIT_STRING               Lexema: "compilador"
+            Token: OPERADOR_PONTOVIRGULA    Lexema: ;
+            Token: {                        Lexema: OPERADOR_CHAVE_ESQ
+            Token: }                        Lexema: OPERADOR_CHAVE_DIR
+            Token: LIT_INT                  Lexema: 2
+            Token: (                        Lexema: OPERADOR_LPAREN
+            Token: )                        Lexema: OPERADOR_RPAREN
+            Token: OPERADOR_CHAVE_ESQ       Lexema: {
+            Token: 2                        Lexema: LIT_INT
+            Token: "compilador"             Lexema: LIT_STRING
+            Token: ;                        Lexema: OPERADOR_PONTOVIRGULA
+            Token: TW_IDENTIFIER            Lexema: print
+            Token: OPERADOR_RPAREN          Lexema: )
+            Token: OPERADOR_CHAVE_DIR       Lexema: }
+            -------------------------------------------------
+
+8)  Resultados: O programa irá analisar o arquivo "teste.txt" e gerar um arquivo de saída chamado "saida.txt". 
+    Este arquivo conterá os resultados da análise léxica, incluindo os tokens identificados. A tabela de símbolos
+    poderá ser analisada pelo próprio terminal.
+
+9)  A medida que ocorre a análise léxica os tokens e símbolos serão adicionados na tabela de símbolos e gravados
+    no arquivo de saída. Caso ocorra algum erro de escrita no programa, o analisador identificará o erro bem como
+    o lexema com problema.

@@ -1,54 +1,261 @@
-#include "stdio.h"
-#include "stdlib.h"
-#include "string.h"
-#include "ctype.h"
-#include "lexico.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+#include <stdbool.h> 
+#include "tokens.h"
 
-/*
-Aluno: Mateus Mota Nobrega - 21953021
-Aluno: Gabriel César Tavares Ferreira - 21854868
-*/
+struct SymbolEntry {
+    char name[100]; // Nome do símbolo (ajuste o tamanho conforme necessário)
+    char *type;     // Tipo do símbolo (agora um ponteiro para char)
+    struct SymbolEntry *next;
+};
+// Variável global para controlar o número de linha
+int linha_atual = 1;
 
-#define MAX_SYMBOLS 100
-
-typedef struct {
-    char* name;
-    int type;
-} Symbol;
-
-Symbol symbol_table[MAX_SYMBOLS];
-int num_symbols = 0;
-
-void add_symbol(char* name, int type) {
-    if (num_symbols >= MAX_SYMBOLS) {
-        printf("Symbol table overflow!\n");
-        exit(1);
-    }
-    symbol_table[num_symbols].name = strdup(name);
-    symbol_table[num_symbols].type = type;
-    num_symbols++;
+int getLineNumber(void) {
+    return linha_atual;
 }
-int lookup_symbol(char* name) {
-    int i;
-    for (i = 0; i < num_symbols; i++) {
-        if (strcmp(symbol_table[i].name, name) == 0) {
-            return symbol_table[i].type;
+
+// Variável global
+bool e = true;
+
+// Função para verificar se a análise ainda está em execução
+int isRunning(void) {
+    return e ? 1 : 0;
+}
+
+// Tamanho da tabela de símbolos (um número primo)
+#define TABLE_SIZE 101
+
+// Tabela de símbolos (matriz de ponteiros para listas)
+
+struct SymbolEntry* symbolTable[TABLE_SIZE];
+
+// Função de hash simples para calcular o índice na tabela hash
+int hash(char *name) {
+    unsigned int hash = 0;
+    while (*name) {
+        hash = (hash * 31) + (*name++);
+    }
+    return hash % TABLE_SIZE;
+}
+
+// Função para inserir um símbolo na tabela de símbolos
+void insertSymbol(char *name, char *type) {
+    int index = hash(name); 
+    // Criar uma nova entrada de símbolo
+    struct SymbolEntry* newEntry = (struct SymbolEntry*) malloc(sizeof(struct SymbolEntry));
+    if (newEntry == NULL) {
+        fprintf(stderr, "Erro: Falha na alocação de memória para um novo símbolo.\n");
+        exit(1); // Você pode escolher como lidar com erros de alocação de memória
+    }
+    strncpy(newEntry->name, name, sizeof(newEntry->name));
+    newEntry->name[sizeof(newEntry->name) - 1] = '\0'; // Certifique-se de que o nome está terminado
+    newEntry->type = strdup(type); // Copiar a string type
+    newEntry->next = NULL;
+    // Verificar se já existe uma lista para esse índice
+    if (symbolTable[index] == NULL) {
+        symbolTable[index] = newEntry;
+    } else {
+        // Tratamento de colisões (adicionar na frente da lista)
+        newEntry->next = symbolTable[index];
+        symbolTable[index] = newEntry;
+    }
+}
+
+int confere_simbolo(char *name) {
+    int index = hash(name);
+    
+    // Verificar se já existe uma lista para esse índice
+    struct SymbolEntry* entry = symbolTable[index];
+    while (entry != NULL) {
+        if (strcmp(entry->name, name) == 0) {
+            return 1; // O símbolo já existe na tabela
+        }
+        entry = entry->next;
+    }
+    
+    return 0; // O símbolo não existe na tabela
+}
+
+void printSymbolTable() {
+    printf("Tabela de Simbolos(HASH):\n");
+    printf("-------------------------------------------------\n");
+    for (int i = 0; i < TABLE_SIZE; i++) {
+        struct SymbolEntry* entry = symbolTable[i];
+        while (entry != NULL) {
+            printf("Token: %-20s\tLexema: %s\n", entry->name, entry->type);
+            entry = entry->next;
         }
     }
-    return ID;
+    printf("-------------------------------------------------\n");
 }
 
-// int verificaToken(Token token){
-//     if(token.type == 0){
-//         return 1;
-//     }
-//     else{
-//         return 0;
-//     }
-// } 
+// Função para verificar se uma palavra é uma palavra reservada
+int eh_palavra_reservada(char *palavra) {
+    char *palavras_reservadas[] = {
+        "char", "int", "real", "bool", "if", "then", "else", "while", "input", "output", "return"
+    };
+    int num_palavras_reservadas = sizeof(palavras_reservadas) / sizeof(palavras_reservadas[0]);
+    for (int i = 0; i < num_palavras_reservadas; i++) {
+        if (strcmp(palavra, palavras_reservadas[i]) == 0) {
+            return 1; // É uma palavra reservada
+        }
+    }
+    return 0; // Não é uma palavra reservada
+}
+char *getTokenReservado(char *palavra) {
+    char *palavras_reservadas[] = {
+        "char", "int", "real", "bool", "if", "then", "else", "while", "input", "output", "return"
+    };
+    int num_palavras_reservadas = sizeof(palavras_reservadas) / sizeof(palavras_reservadas[0]);
+    
+    for (int i = 0; i < num_palavras_reservadas; i++) {
+        if (strcmp(palavra, palavras_reservadas[i]) == 0) {
+            char *resultado = malloc(strlen("KW") + strlen(palavras_reservadas[i]) + 1);
+            if (resultado != NULL) {
+                strcpy(resultado, "KW_");
+                strcat(resultado, palavras_reservadas[i]);
+                return resultado;
+            } else {
+                // Tratamento de erro na alocação de memória
+                return NULL;
+            }
+        }
+    }
+    
+    // Retorno para caso a palavra não seja encontrada nas reservadas
+    return NULL;
+}
 
-void grava_token(FILE *file, Token token){
-    fprintf(file, "<%s, %s>\n", token.name, token.value);
+char obter_token_operador(char operador) {
+    char operadores[] = {',', ';', '(', ')', '[', ']', '{', '}', '+', '-', 
+                        '*', '/', '%', '&', '|', '~', '=', '<', '>', ':', '.'};
+    int tokens[] = {OPERADOR_VIRGULA, OPERADOR_PONTOVIRGULA, OPERADOR_LPAREN, 
+                OPERADOR_RPAREN, OPERADOR_COLCHETE_ESQ, OPERADOR_COLCHETE_DIR, OPERADOR_CHAVE_ESQ, 
+                OPERADOR_CHAVE_DIR, OPERADOR_SOMA, OPERADOR_SUBTRACAO, OPERADOR_MULTIPLICACAO, 
+                OPERADOR_DIVISAO, OPERADOR_MODULO, OPERADOR_E, OPERADOR_OU, OPERADOR_NAO, 
+                OPERADOR_ATRIBUICAO, OPERADOR_MENOR, OPERADOR_MAIOR, OPERADOR_DOISPONTOS, OPERADOR_PONTO};
+    int num_operadores = sizeof(operadores) / sizeof(operadores[0]);
+    for (int i = 0; i < num_operadores; i++) {
+        if (operador == operadores[i]) {
+            return tokens[i];
+        }
+    }
+    return -1; // Operador desconhecido
+}
+
+char *getOperatorTokenName(int num) {
+    switch (num) {
+        case OPERADOR_VIRGULA:
+            return "OPERADOR_VIRGULA";
+        case OPERADOR_PONTOVIRGULA:
+            return "OPERADOR_PONTOVIRGULA";
+        case OPERADOR_LPAREN:
+            return "OPERADOR_LPAREN";
+        case OPERADOR_RPAREN:
+            return "OPERADOR_RPAREN";
+        case OPERADOR_COLCHETE_ESQ:
+            return "OPERADOR_COLCHETE_ESQ";
+        case OPERADOR_COLCHETE_DIR:
+            return "OPERADOR_COLCHETE_DIR";
+        case OPERADOR_CHAVE_ESQ:
+            return "OPERADOR_CHAVE_ESQ";
+        case OPERADOR_CHAVE_DIR:
+            return "OPERADOR_CHAVE_DIR";
+        case OPERADOR_ATRIBUICAO:
+            return "OPERADOR_ATRIBUICAO";
+        case OPERADOR_SOMA:
+            return "OPERADOR_SOMA";
+        case OPERADOR_SUBTRACAO:
+            return "OPERADOR_SUBTRACAO";
+        case OPERADOR_MULTIPLICACAO:
+            return "OPERADOR_MULTIPLICACAO";
+        case OPERADOR_DIVISAO:
+            return "OPERADOR_DIVISAO";
+        case OPERADOR_MODULO:
+            return "OPERADOR_MODULO";
+        case OPERADOR_MENOR:
+            return "OPERADOR_MENOR";
+        case OPERADOR_MAIOR:
+            return "OPERADOR_MAIOR";
+        case OPERADOR_E:
+            return "OPERADOR_E";
+        case OPERADOR_OU:
+            return "OPERADOR_OU";
+        case OPERADOR_NAO:
+            return "OPERADOR_NAO";
+        case OPERADOR_LE:
+            return "OPERADOR_LE";
+        case OPERADOR_GE:
+            return "OPERADOR_GE";
+        case OPERADOR_EQ:
+            return "OPERADOR_EQ";
+        case OPERADOR_PONTO:
+            return "OPERADOR_PONTO";
+        case OPERADOR_DOISPONTOS:
+            return "OPERADOR_DOISPONTOS";
+        default:
+            return NULL; // Retorne NULL para valores desconhecidos
+    }
+}
+
+
+int verificar_operador_composto(FILE *arquivo, char *token) {
+    char proximo_caractere = fgetc(arquivo);
+    int token_operador = -1;
+
+    switch (token[0]) {
+        case '=':
+            if (proximo_caractere == '=') {
+                strcat(token, "=");
+                token_operador = OPERADOR_EQ;
+            } else {
+                // Não é um operador composto, volte um caractere para o arquivo
+                ungetc(proximo_caractere, arquivo);
+            }
+    return token_operador;
+}
+}
+
+void to_upper(char* string)
+{
+    const char OFFSET = 'a' - 'A';
+    while (*string)
+    {
+        *string = (*string >= 'a' && *string <= 'z') ? *string -= OFFSET : *string;
+        string++;
+    }
+}
+
+
+int verificar_string(FILE *arquivo, char *token) {
+    int c = fgetc(arquivo);
+    if (c == '"') {
+        int i = 0;
+        token[i++] = '"';
+        c = fgetc(arquivo);
+        while (c != EOF && c != '"') {
+            token[i++] = c;
+            c = fgetc(arquivo);
+        }
+        if (c == '"') {
+            token[i++] = '"';
+            token[i] = '\0';
+            return LIT_STRING;
+        }
+    }
+    return -1; // Não é uma string
+}
+
+int verificar_pontuacao(FILE *arquivo, char *token) {
+    if (token[0] == '.') {
+        return OPERADOR_PONTO;
+    } else if (token[0] == ';') {
+        return OPERADOR_PONTOVIRGULA;
+    }
+    return -1; // Não é um ponto ou ponto e vírgula
 }
 
 char prox_char(FILE* file){
@@ -56,487 +263,265 @@ char prox_char(FILE* file){
     do {
         ch = fgetc(file);
     } while(ch == ' ' || ch == '\t' || ch == '\n');
+        if(ch=='\n') {
+            linha_atual++;
+        }
     return ch;
 }
 
-Token analex(char c, FILE *file){
-    Token token;
-    char buffer[100] = {0};
-    char ch;
-    buffer[0] = c;
-    int i = 1;
-    //INT E FLOAT
-    if(isdigit(c)){
-        while(isdigit(ch = prox_char(file))){
-            buffer[i] = ch;
-            i++;
-        }
-        if(ch == '.'){
-            buffer[i] = ch;
-            i++;
-            if(!isdigit(ch = fgetc(file))){
-                token.type = 0;
-                token.value = strdup(buffer);
-                token.name = "ERRO Numero Real Incompleto";
-            }
-            else{
-                buffer[i] = ch;
-                i++;
-                while(isdigit(ch = prox_char(file))){
-                buffer[i] = ch;
-                i++;
-                }            
-                token.type = NUM_FLOAT;
-                token.value = strdup(buffer);
-                token.name = "NUM_FLOAT";
-            }
-            return token;
-        }
-        ungetc(ch, file);
-        token.type = NUM_INT;
-        token.value = strdup(buffer);
-        token.name = "NUM_INT"; 
-        return token;
-    }
-    //STRINGS
-    else if(c == '"'){
-        while((ch = fgetc(file)) != EOF){     
-            if(ch == '"'){
-                token.type = STRINGS;
-                token.value = strdup(buffer);
-                token.name = "STRINGS";
-                break;
-            }
-            else if(ch == ' '){ 
-                token.type = 0;
-                token.value = strdup(buffer);
-                token.name = "ERRO string incompleta";
-                break;
-            }
-            else{
-                buffer[i] = ch;
-                i++;   
-            }
-        }
-        return token;
+void grava_token(FILE *saida, char *token, char *lexema) {
+    fprintf(saida, "Token:%-20s\tLexema: %s\n", token, lexema);
+    if (!confere_simbolo(token)) { insertSymbol(token, lexema);}
 
-    }
-    //CARACTERE
-    else if(c == '\''){
-        ch = prox_char(file);
-        buffer[i] = ch;
-        i++;
-        if((ch = prox_char(file)) == '\''){
-            buffer[i] = ch;
-            token.type = CARACTERE;
-            token.value = strdup(buffer);
-            token.name = "CARACTERE";
-            return token;
-        }
-        else{
-            buffer[i] = ch;
-            token.type = 0;
-            token.value = strdup(buffer);
-            token.name = "CARACTERE INCOMPLETO";
-            return token;
-        }
-    }
-
-    // OPERADORES 
-    else if (c == '/') {
-        if ((ch = prox_char(file)) == '=') {
-            buffer[i] = ch;
-            i++;
-            token.type = OPATRIBDIV;
-            token.value = strdup(buffer);
-            token.name = "OPATRIBDIV";
-            return token;
-        } else {
-            ungetc(ch, file);
-            token.type = OPDIV;
-            token.value = strdup(buffer);
-            token.name = "OPDIV";
-            return token;
-        }
-    } 
-    else if (c == '*') {
-        if ((ch = prox_char(file)) == '=') {
-            buffer[i] = ch;
-            i++;
-            token.type = OPATRIBMULT;
-            token.value = strdup(buffer);
-            token.name = "OPATRIBMULT";
-            return token;
-        } else {
-            ungetc(ch, file);
-            token.type = OPMULT;
-            token.value = strdup(buffer);
-            token.name = "OPMULT";
-            return token;
-        }
-    } 
-    else if (c == '=') {
-        if ((ch = prox_char(file)) == '=') {
-            buffer[i] = ch;
-            i++;
-            token.type = OPIG;
-            token.value = strdup(buffer);
-            token.name = "OPIG";
-            return token;
-        } else {
-            ungetc(ch, file);
-            token.type = OPATRIB;
-            token.value = strdup(buffer);
-            token.name = "OPATRIB";
-            return token;
-        }
-    } 
-    else if( c == '+'){
-        if((ch = fgetc(file)) == '+'){
-            buffer[i] = ch;
-            i++;
-            token.type = OPINC;
-            token.value = strdup(buffer);
-            token.name = "OPINC";
-            return token;
-        }
-        else{
-            ungetc(ch, file);
-        }
-        if((ch = prox_char(file)) == '='){
-            buffer[i] = ch;
-            i++;
-            token.type = OPDATRIBAD;
-            token.value = strdup(buffer);
-            token.name = "OPATRIBAD";
-            return token;
-        }
-        else{
-            ungetc(ch, file);
-            token.type = OPAD;
-            token.value = strdup(buffer);
-            token.name = "OPAD";
-            return token;
-        }
-    }
-    else if (c == '%') {
-        if ((ch = prox_char(file)) == '=') {
-            buffer[i] = ch;
-            i++;
-            token.type = OPATRIBMOD;
-            token.value = strdup(buffer);
-            token.name = "OPATRIBMOD";
-            return token;
-        } else {
-            ungetc(ch, file);
-            token.type = OPMOD;
-            token.value = strdup(buffer);
-            token.name = "OPMOD";
-            return token;
-        }
-    }
-    else if (c == '<') {
-        if ((ch = prox_char(file)) == '=') {
-            buffer[i] = ch;
-            i++;
-            token.type = OPMENIG;
-            token.value = strdup(buffer);
-            token.name = "OPMENIG";
-            return token;
-        } else {
-            ungetc(ch, file);
-            token.type = OPREMEN;
-            token.value = strdup(buffer);
-            token.name = "OPREMEN";
-            return token;
-        }
-    }
-    else if (c == '>') {
-        if ((ch = prox_char(file)) == '=') {
-            buffer[i] = ch;
-            i++;
-            token.type = OPMAIIG;
-            token.value = strdup(buffer);
-            token.name = "OPMAIIG";
-            return token;
-        } else {
-            ungetc(ch, file);
-            token.type = OPREMAI;
-            token.value = strdup(buffer);
-            token.name = "OPREMAI";
-            return token;
-        }
-    }
-    else if (c == '&') {
-        if ((ch = prox_char(file)) == '&') {
-            buffer[i] = ch;
-            i++;
-            token.type = OPAND;
-            token.value = strdup(buffer);
-            token.name = "OPAND";
-            return token;
-        } else {
-            ungetc(ch, file);
-            token.type = OPANDBB;
-            token.value = strdup(buffer);
-            token.name = "OPANDBB";
-            return token;
-        }
-    }
-    else if (c == '!') {
-        if ((ch = prox_char(file)) == '=') {
-            buffer[i] = ch;
-            i++;
-            token.type = OPDIF;
-            token.value = strdup(buffer);
-            token.name = "OPDIF";
-            return token;
-        } else {
-            ungetc(ch, file);
-            token.type = OPNOT;
-            token.value = strdup(buffer);
-            token.name = "OPNOT";
-            return token;
-        }
-    }
-    else if(c == '|'){
-        if((ch = prox_char(file)) == '|'){
-            buffer[i] = ch;
-            i++;
-            token.type = OPOR;
-            token.value = strdup(buffer);
-            token.name = "OPOR";
-            return token;
-        }
-        else{
-            ungetc(ch, file);
-            token.type = ID;
-            token.value = strdup(buffer);
-            token.name = "ID";
-            return token;
-        }
-    }
-    else if(c == '.'){
-        token.type = OPSTRUC;
-        token.value = strdup(buffer);
-        token.name = "OPSTRUC";
-        return token;
-    }
-    else if(c == '?'){
-        if((ch = prox_char(file)) == ':'){
-            buffer[i] = ch;
-            i++;
-            token.type = OPTERN;
-            token.value = strdup(buffer);
-            token.name = "OPTERN";
-            return token;
-        }
-        else{
-            ungetc(ch, file);
-            token.type = ID;
-            token.value = strdup(buffer);
-            token.name = "ID";
-            return token;
-        }
-    }
-    else if(c == '-'){
-        if((ch = prox_char(file)) == '>'){
-            buffer[i] = ch;
-            i++;
-            token.type = OPPONTSTRUC;
-            token.value = strdup(buffer);
-            token.name = "OPPONTSTRUC";
-            return token;
-        }
-        else{
-            ungetc(ch, file);
-        }
-        if((ch = prox_char(file)) == '='){
-            buffer[i] = ch;
-            i++;
-            token.type = OPATRIBSUB;
-            token.value = strdup(buffer);
-            token.name = "OPATRIBSUB";
-            return token;
-        }
-        else{
-            ungetc(ch, file);
-            token.type = OPSUB;
-            token.value = strdup(buffer);
-            token.name = "OPSUB";
-            return token;
-        }
-    }
-    //PONTUAÇÕES
-    else if(c == ','){
-        token.type = VIRG;
-        token.value = strdup(buffer);
-        token.name = "VIRG";
-        return token;
-    }
-    else if(c == ';'){
-        token.type = PV;
-        token.value = strdup(buffer);
-        token.name = "PV";
-        return token;
-    }
-    else if(c == '('){
-        token.type = OPENPAR;
-        token.value = strdup(buffer);
-        token.name = "OPENPAR";
-        return token;
-    }
-    else if(c == ')'){
-        token.type = CLOSEPAR;
-        token.value = strdup(buffer);
-        token.name = "CLOSEPAR";
-        return token;
-    }
-    else if(c == '{'){
-        token.type = OPENCHAV;
-        token.value = strdup(buffer);
-        token.name = "OPENCHAV";
-        return token;
-    }
-    else if(c == '}'){
-        token.type = CLOSECHAV;
-        token.value = strdup(buffer);
-        token.name = "CLOSECHAV";
-        return token;
-    }
-    else if(c == '['){
-        token.type = OPENCOLC;
-        token.value = strdup(buffer);
-        token.name = "OPENCOLC";
-        return token;
-    }
-    else if(c == ']'){
-        token.type = CLOSECOLC;
-        token.value = strdup(buffer);
-        token.name = "CLOSECOLC";
-        return token;
-    }
-
-    //PALAVRAS RESERVADAS
-    else{
-        while((ch = fgetc(file)) != EOF){
-                buffer[i] = ch;
-                i++;
-                if(i == 4 && strcmp("void", buffer) == 0){
-                    token.type = VOID;
-                    token.value = strdup(buffer);
-                    token.name = "VOID";
-                    break;
-                }
-                else if(i == 4 && strcmp("main", buffer) == 0){
-                    token.type = MAIN_PR;
-                    token.value = strdup(buffer);
-                    token.name = "MAIN_PR";
-                    break;
-                }
-                else if(i == 3  && strcmp("int ", buffer) == 0){
-                    token.type = TIPO_INT;
-                    token.value = strdup(buffer);
-                    token.name = "TIPO_INT";
-                    break;
-                }
-                else if(i == 5 && strcmp("float", buffer) == 0){
-                    token.type = TIPO_FLOAT;
-                    token.value = strdup(buffer);
-                    token.name = "TIPO_FLOAT";
-                    break;
-                }
-                else if(i == 4 && strcmp("char", buffer) == 0){
-                    token.type = TIPO_CHAR;
-                    token.value = strdup(buffer);
-                    token.name = "TIPO_CHAR";
-                    break;
-                }
-                else if(i == 4 && strcmp("bool", buffer) == 0){
-                    token.type = BOOLEANO;
-                    token.value = strdup(buffer);
-                    token.name = "BOOLEANO";
-                    break;
-                }
-                else if(i == 2 && strcmp("if", buffer) == 0){
-                    token.type = IF_PR;
-                    token.value = strdup(buffer);
-                    token.name = "IF_PR";
-                    break;
-                }
-                else if(i == 4 && strcmp("else", buffer) == 0){
-                    token.type = ELSE_PR;
-                    token.value = strdup(buffer);
-                    token.name = "ELSE_PR";
-                    break;
-                }
-                else if(i == 3 && strcmp("for", buffer) == 0){
-                    token.type = FOR_PR;
-                    token.value = strdup(buffer);
-                    token.name = "FOR_PR";
-                    break;
-                }
-                else if(i == 5 && strcmp("while", buffer) == 0){
-                    token.type = WHILE_PR;
-                    token.value = strdup(buffer);
-                    token.name = "WHILE_PR";
-                    break;
-                }
-                else if(i == 2 && strcmp("do", buffer) == 0){
-                    token.type = DO_PR;
-                    token.value = strdup(buffer);
-                    token.name = "DO_PR";
-                    break;
-                }
-                else if(i == 6 && strcmp("return", buffer) == 0){
-                    token.type = RETURN_PR;
-                    token.value = strdup(buffer);
-                    token.name = "RETURN_PR";
-                    break;
-                }
-                else if(i == 5 && strcmp("break", buffer) == 0){
-                    token.type = BREAK_PR;
-                    token.value = strdup(buffer);
-                    token.name = "BREAK_PR";
-                    break;
-                }
-                else if(i == 8 && strcmp("continue", buffer) == 0){
-                    token.type = CONTINUE_PR;
-                    token.value = strdup(buffer);
-                    token.name = "CONTINUE_PR";
-                    break;
-                }
-                else if(i == 4 && strcmp("goto", buffer) == 0){
-                    token.type = GOTO_PR;
-                    token.value = strdup(buffer);
-                    token.name = "GOTO_PR";
-                    break;
-                }
-                else if(i == 4 && strcmp("true", buffer) == 0){
-                    token.type = TRUE_PR;
-                    token.value = strdup(buffer);
-                    token.name = "TRUE_PR";
-                    break;
-                }
-                else if(i == 5 && strcmp("false", buffer) == 0){
-                    token.type = FALSE_PR;
-                    token.value = strdup(buffer);
-                    token.name = "FALSE_PR";
-                    break;
-                }
-                else if(isspace(ch)){
-                    token.type = ID;
-                    token.value = strdup(buffer);
-                    token.name = "ID";
-                    break;
-                }
-                else{
-                    token.type = ID;
-                    token.value = strdup(buffer);
-                    token.name = "ID";
-                }
-            }
-            return token;
-            }
 }
 
+void analise_lexica(FILE *arquivo, FILE *saida) {
+    char token[100];
+    int c;
+    char ch; //variavel para usar para pegar o proximoChar quando necessario
+    int comentario = 0; // Variável para controlar se estamos dentro de um comentário de bloco
+    int cont = 0; //contador
+
+    while ((c = prox_char(arquivo)) != EOF) {
+          
+        if (c == '\n') {
+            // Atualize o número da linha quando encontrar uma nova linha
+            linha_atual++;
+        }
+        if (c == '/') {
+            int c2 = prox_char(arquivo);
+            if (c2 == '/') {
+                // É um comentário de linha, ignorar até a quebra de linha
+                while ((c = prox_char(arquivo)) != EOF && c != '\n');
+            } else if (c2 == '*') {
+                // É o início de um comentário de bloco, marcar como tal
+                comentario = 1;
+                while (1) {
+                    c = prox_char(arquivo);
+                    if (c == EOF) {
+                        e = false;
+                        //fprintf(saida, "Erro: Comentário de bloco não fechado.\n");
+                        break;
+                    }
+                    if (c == '*') {
+                        int c3 = prox_char(arquivo);
+                        if (c3 == '/') {
+                            comentario = 0; // Fim do comentário de bloco
+                            break;
+                        } else {
+                            ungetc(c3, arquivo);
+                        }
+                    }
+                }
+            } else {
+                // Não é um comentário, tratar como caractere normal
+                ungetc(c2, arquivo);
+                token[0] = c;
+                token[1] = '\0';
+                int token_operador = obter_token_operador(token[0]);
+                if (token_operador != -1) {
+                    fprintf(saida, "Token: OPERADOR_%s\t\tLexema: %s\n",token, token);
+                    
+                } else {
+                    fprintf(saida, "Token: DESCONHECIDO\t\tLexema: %s\n", token);
+                if (!confere_simbolo(token)) { insertSymbol(token, "TOKEN_ERROR");}
+                }
+            }
+        } else if (comentario) {
+            // Estamos dentro de um comentário de bloco, ignorar até encontrar o fim
+            if (c == '*') {
+                int c2 = prox_char(arquivo);
+                if (c2 == '/') {
+                    comentario = 0; // Fim do comentário de bloco
+                } else {
+                    ungetc(c2, arquivo);
+                }
+            }
+        } else if (isspace(c)) {
+            // Ignorar espaços em branco
+            continue;
+        } else if (isalpha(c) || c == '_') {
+            // Identificador
+            int i = 0;
+            while (isalnum(c) || c == '_') {
+                token[i++] = c;
+                if (c == ' '){
+                    printf("aaa");
+                } 
+                c = prox_char(arquivo);
+            }
+            token[i] = '\0';
+            if (eh_palavra_reservada(token)) {
+                char *tokenReservado= getTokenReservado(token);
+                to_upper(tokenReservado);
+                grava_token(saida,tokenReservado,token);
+            } else {
+                grava_token(saida, "TW_IDENTIFIER",token);
+            }
+            ungetc(c, arquivo); // Coloca o caractere de volta no arquivo
+        } else if (isdigit(c)) {
+            // Literal inteiro ou real
+            int i = 0;
+            while (isdigit(c) || c == '.') {
+                token[i++] = c;
+                c = prox_char(arquivo);
+            }
+            token[i] = '\0';
+            if (strchr(token, '.') != NULL) {
+                // fprintf(saida, "Token: LIT_REAL\tLexema: %s\n", token);
+                grava_token(saida, "LIT_REAL",token);
+            } else {
+                grava_token(saida, "LIT_INT", token);
+            }
+            ungetc(c, arquivo); // Coloca o caractere de volta no arquivo
+        } 
+        //LITCHAR
+            else if (c == '\'') {
+            token[0] = c;
+            ch = prox_char(arquivo);
+            cont = 1; // Inicialize cont para 1
+            while (ch != '\'' && ch != '\n') { // Verifique se não é um apóstrofo simples ou uma nova linha
+                token[cont] = ch;
+                cont++;
+                ch = prox_char(arquivo);
+            }
+            if (ch == '\'') {
+                // Verificou-se que o caractere literal foi fechado corretamente
+                token[cont] = ch;
+                token[cont+1] ='\0';// Adicione o apóstrofo simples de fechamento ao token
+                grava_token(saida, "LIT_CHAR", token);
+            } else {
+                // Tratamento de erro: caractere literal não foi fechado
+                // Você pode lançar um erro ou tomar alguma outra ação apropriada aqui.
+            }
+        }
+        //STRINGS
+         else if (c == '"') {
+            int i = 0;
+            token[i++] = '"';
+            c = prox_char(arquivo);
+            while (c != EOF && c != '"') {
+                token[i++] = c;
+                c = prox_char(arquivo);
+            }
+            if (c == '"') {
+                token[i++] = '"';
+                token[i] = '\0';
+                grava_token(saida, "LIT_STRING",token);
+            } else {
+                token[i++] = '\0';
+                grava_token(saida, "DESCONHECIDO",token);
+            }
+        } 
+        //operadores simples
+        else if (c == '.' || c == ',' || c == ';' || 
+                    c == '(' || c == ')' || c == '[' || c == ']' || c == '{' || c == '}' || 
+                    c == '+' || c == '-' || c == '*' || c == '/' || c == '%' || c == '&' || c == '|' ||
+                     c == '~' || c == ':' ) {
+            token[0] = c;
+            token[1] = '\0';
+            int token_operador = obter_token_operador(token[0]);
+            char * tokenName = getOperatorTokenName(token_operador);
+            if (token_operador != -1) {
+                grava_token(saida, tokenName, token);
+
+            } else {
+                grava_token(saida, "DESCONHECIDO", token);
+                }
+            }
+            //operador Composto == 
+            else if (c == '='){
+                ch = prox_char(arquivo);
+                if(ch == '=') {
+                     token[0] = c;
+                     token[1] = ch;
+                     token[2] = '\0';
+                     grava_token(saida, "OPERATOR_EQ", token);
+                }else{
+                ungetc(ch, arquivo);
+                token[0] = c;
+                token[1] = '\0';
+                int token_operador = obter_token_operador(token[0]);
+                char * tokenName = getOperatorTokenName(token_operador);
+                if (token_operador != -1) {
+                    grava_token(saida, tokenName, token);
+
+                } else {
+                    grava_token(saida, "DESCONHECIDO", token);
+                    }
+                }
+            }
+            //operador Composto >= 
+            else if (c == '>'){
+                ch = prox_char(arquivo);
+                if(ch == '=') {
+                    token[0] = c;
+                    token[1] = ch;
+                    token[2] = '\0';
+                    grava_token(saida, "OPERATOR_GE", token);
+                }else {
+                //operadore simples >
+                ungetc(ch, arquivo);
+                token[0] = c;
+                token[1] = '\0';
+                int token_operador = obter_token_operador(token[0]);
+                char * tokenName = getOperatorTokenName(token_operador);
+                if (token_operador != -1) {
+                    grava_token(saida, "OPERADOR_MAIOR", token);
+                } else {
+                    grava_token(saida, "DESCONHECIDO", token);
+                    }
+                }       
+            }
+             //operador Composto <= 
+            else if (c == '<'){
+                ch = prox_char(arquivo);
+                if(ch == '=') {
+                    token[0] = c;
+                    token[1] = ch;
+                    token[2] = '\0';
+                    grava_token(saida, "OPERATOR_LE", token);
+                }else {
+                //operadore simples <
+                token[0] = c;
+                token[1] = '\0';
+                int token_operador = obter_token_operador(token[0]);
+                char * tokenName = getOperatorTokenName(token_operador);
+                if (token_operador != -1) {
+                    grava_token(saida, "OPERATOR_MENOR", token);
+                } else {
+                    grava_token(saida, "DESCONHECIDO", token);
+                    }
+                }       
+            }
+            //Operador composto !=
+               else if (c == '!'){
+                ch = prox_char(arquivo);
+                if(ch == '=') {
+                    token[0] = c;
+                    token[1] = ch;
+                    token[2] = '\0';
+                    grava_token(saida, "OPERATOR_DIF", token);
+                } else{
+                    grava_token(saida, "DESCONHECIDO", token);
+                }    
+            }
+            if (c == EOF) {
+                e = false;
+            }            
+    }
+        
+
+    // Verificar se o código terminou com um comentário de bloco aberto
+    if (comentario) {
+        fprintf(saida, "Erro: Comentário de bloco não fechado.\n");
+    }
+
+    //função isRUnning
+    if (isRunning()) {
+        printf("A análise está em execução.\n");
+    } else {
+        printf("A análise foi concluída.\n");
+    }
+
+}
